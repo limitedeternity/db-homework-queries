@@ -31,16 +31,10 @@ FROM
 
 FULL JOIN (
     SELECT
-        tbl.sid,
-        fmt_percent((tbl.tip_share - qry.avg_tip_share) / qry.avg_tip_share)
+        sid,
+        fmt_percent((tip_share - AVG(tip_share) OVER ()) / AVG(tip_share) OVER ())
         AS total_avg_tip_diff
-    FROM cte AS tbl
-    LEFT JOIN (
-        SELECT
-            AVG(tip_share) AS avg_tip_share
-        FROM cte
-    ) AS qry
-    ON TRUE
+    FROM cte
 ) AS q2
 ON q1.sid = q2.sid
 
@@ -87,22 +81,13 @@ WITH cte AS (
     FROM dataset
 )
 SELECT
-   tbl.sid,
-   tbl.tip_share,
-   qry.avg_tip_share,
-   tbl.tip_share - qry.avg_tip_share AS difference
-FROM cte AS tbl
-LEFT JOIN LATERAL (
-    SELECT
-        sid,
-        AVG(tip_share)
-        /* FILTER ( */
-        /*     WHERE */
-        /*     trip_distance >= tbl.trip_distance AND */
-        /*     tpep_pickup_date = tbl.tpep_pickup_date */
-        /* ) */
-        OVER (PARTITION BY tpep_pickup_date)
-        AS avg_tip_share
-    FROM cte
-) AS qry
-ON tbl.sid = qry.sid;
+    sid,
+    tip_share,
+    AVG(tip_share) OVER w AS avg_tip_share,
+    tip_share - AVG(tip_share) OVER w AS difference
+FROM cte
+WINDOW w AS (
+    PARTITION BY tpep_pickup_date
+    ORDER BY trip_distance ASC
+    ROWS BETWEEN CURRENT ROW AND UNBOUNDED FOLLOWING
+)
